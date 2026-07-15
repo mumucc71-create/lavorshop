@@ -11,9 +11,9 @@ const copy = {
     language: "English",
     eyebrow: "오늘의 마감 임박 공구",
     heroTitle: "같이 사면,\n가격이 달라져요",
-    heroBody: "100명이 모이면 판매자가 약속한 최저가로 거래가 확정돼요.",
+    heroBody: "모든 상품은 정가의 50%. 지금 절반만 결제하고, 100명 달성 후 나머지를 결제해요.",
     seeDeal: "지금 참여하기",
-    guarantee: "100명 미달 시 100% 자동 환불",
+    guarantee: "무조건 50% 할인 · 1인 최대 3개 · 미달 시 선결제 자동 환불",
     live: "실시간 인기 공구",
     all: "전체보기",
     people: "명 참여",
@@ -33,11 +33,11 @@ const copy = {
     step3Body: "최저가 확정 후 배송이 시작돼요.",
     sheetTitle: "공동구매 참여하기",
     quantity: "수량",
-    total: "결제 예정 금액",
-    paymentNote: "샘플 화면입니다. 실제 결제는 진행되지 않습니다.",
+    total: "오늘 선결제 금액 (공구가의 50%)",
+    paymentNote: "100명 달성 후 나머지 50%를 결제합니다. 1인 최대 3개까지 구매할 수 있습니다. 샘플 화면이므로 실제 결제는 진행되지 않습니다.",
     join: "공구 참여 예약하기",
     success: "참여 예약이 완료됐어요!",
-    successBody: "100명 달성 시 배송이 시작됩니다.",
+    successBody: "공구가의 50% 선결제가 예약됐습니다. 100명 달성 후 나머지 50%를 결제합니다.",
     close: "확인",
   },
   en: {
@@ -46,9 +46,9 @@ const copy = {
     language: "한국어",
     eyebrow: "Ending soon today",
     heroTitle: "Buy together,\npay less",
-    heroBody: "When 100 people join, the seller's promised lowest price is confirmed.",
+    heroBody: "Every item is 50% off. Pay half now and the other half when 100 people join.",
     seeDeal: "Join the deal",
-    guarantee: "100% automatic refund if fewer than 100 join",
+    guarantee: "Always 50% off · Maximum 3 per person · Deposit refunded if the deal fails",
     live: "Trending group deals",
     all: "View all",
     people: " joined",
@@ -68,19 +68,19 @@ const copy = {
     step3Body: "Shipping starts at the lowest price.",
     sheetTitle: "Join this group deal",
     quantity: "Quantity",
-    total: "Estimated total",
-    paymentNote: "This is a demo. No actual payment will be made.",
+    total: "Pay today (50% of deal price)",
+    paymentNote: "Pay the remaining 50% after 100 people join. Maximum 3 items per person. This is a demo; no actual payment will be made.",
     join: "Reserve my spot",
     success: "Your spot is reserved!",
-    successBody: "Shipping starts once the deal reaches 100 people.",
+    successBody: "Your 50% deposit is reserved. Pay the remaining 50% once the deal reaches 100 people.",
     close: "Done",
   },
 };
 
 const products = [
-  { emoji: "🍳", ko: "올스텐 인덕션 프라이팬 2종", en: "All-steel induction pan set", price: 39900, original: 68900, joined: 84, time: [0, 18], color: "peach" },
-  { emoji: "☕", ko: "스페셜티 드립백 커피 30개", en: "Specialty drip coffee 30-pack", price: 24900, original: 42000, joined: 72, time: [1, 6], color: "cream" },
-  { emoji: "🧺", ko: "호텔 수건 프리미엄 10장", en: "Premium hotel towels, set of 10", price: 29900, original: 55000, joined: 96, time: [0, 9], color: "mint" },
+  { emoji: "🍳", ko: "올스텐 인덕션 프라이팬 2종", en: "All-steel induction pan set", price: 39900, original: 79800, joined: 84, time: [0, 18], color: "peach" },
+  { emoji: "☕", ko: "스페셜티 드립백 커피 30개", en: "Specialty drip coffee 30-pack", price: 24900, original: 49800, joined: 72, time: [1, 6], color: "cream" },
+  { emoji: "🧺", ko: "호텔 수건 프리미엄 10장", en: "Premium hotel towels, set of 10", price: 29900, original: 59800, joined: 96, time: [0, 9], color: "mint" },
 ];
 
 const won = (n: number, lang: Language) => lang === "ko" ? `${n.toLocaleString("ko-KR")}원` : `₩${n.toLocaleString("en-US")}`;
@@ -93,7 +93,7 @@ export default function Home() {
   const [quantity, setQuantity] = useState(1);
   const t = copy[lang];
   const product = products[selected];
-  const discount = useMemo(() => Math.round((1 - product.price / product.original) * 100), [product]);
+  const deposit = useMemo(() => product.price * quantity / 2, [product, quantity]);
 
   const openDeal = (index: number) => {
     setSelected(index);
@@ -142,7 +142,7 @@ export default function Home() {
               <div className="dealInfo">
                 <div className="seller">BAEKDEAL SELECT</div>
                 <h3>{lang === "ko" ? p.ko : p.en}</h3>
-                <div className="prices"><b>{Math.round((1-p.price/p.original)*100)}%</b><strong>{won(p.price, lang)}</strong><del>{won(p.original, lang)}</del></div>
+                <div className="prices"><b>50%</b><strong>{won(p.price, lang)}</strong><del>{won(p.original, lang)}</del></div>
                 <div className="progressLabel"><strong>{p.joined}{lang === "ko" ? t.people : t.people}</strong><span>{pct}% {t.achieved}</span></div>
                 <div className="progress"><span style={{width: `${pct}%`}} /></div>
                 <div className="timer">◷ {t.deadline} <b>{p.time[0]}{t.days} {p.time[1]}{t.hours}</b></div>
@@ -169,8 +169,8 @@ export default function Home() {
           {!success ? <>
             <span className="sheetEmoji">{product.emoji}</span><span className="sectionKicker">BAEKDEAL</span><h2>{t.sheetTitle}</h2><p className="sheetProduct">{lang === "ko" ? product.ko : product.en}</p>
             <div className="sheetProgress"><div><b>{product.joined}{lang === "ko" ? "명" : ""}</b><span>/ 100</span></div><div className="progress"><span style={{width: `${product.joined}%`}} /></div><small>{100-product.joined}{t.left}</small></div>
-            <div className="quantity"><span>{t.quantity}</span><div><button onClick={() => setQuantity(Math.max(1, quantity-1))}>−</button><b>{quantity}</b><button onClick={() => setQuantity(quantity+1)}>＋</button></div></div>
-            <div className="total"><span>{t.total}</span><div><del>{won(product.original*quantity, lang)}</del><strong>{won(product.price*quantity, lang)}</strong><b>-{discount}%</b></div></div>
+            <div className="quantity"><span>{t.quantity} <small>{lang === "ko" ? "(최대 3개)" : "(max 3)"}</small></span><div><button onClick={() => setQuantity(Math.max(1, quantity-1))} disabled={quantity === 1}>−</button><b>{quantity}</b><button onClick={() => setQuantity(Math.min(3, quantity+1))} disabled={quantity === 3}>＋</button></div></div>
+            <div className="total"><span>{t.total}</span><div><del>{lang === "ko" ? `공구가 ${won(product.price*quantity, lang)}` : `Deal total ${won(product.price*quantity, lang)}`}</del><strong>{won(deposit, lang)}</strong><b>50%</b></div></div>
             <p className="notice">ⓘ {t.paymentNote}</p>
             <button className="primary joinButton" onClick={() => setSuccess(true)}>{t.join}</button>
           </> : <div className="success"><div>✓</div><h2>{t.success}</h2><p>{t.successBody}</p><button className="primary" onClick={() => { setSuccess(false); setSheet(false); }}>{t.close}</button></div>}
