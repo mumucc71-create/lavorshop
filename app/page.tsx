@@ -4,7 +4,12 @@ import { FormEvent, useMemo, useState } from "react";
 
 type Language = "ko" | "en";
 type Role = "buyer" | "seller";
-type Product = { emoji: string; ko: string; en: string; price: number; original: number; joined: number; time: [number, number]; color: string; seller: string };
+type Category = "food" | "living" | "kitchen" | "beauty" | "fashion" | "digital";
+type Product = { emoji: string; category: Category; ko: string; en: string; price: number; original: number; joined: number; time: [number, number]; color: string; seller: string };
+
+const categories: {id: "all" | Category; emoji: string; ko: string; en: string}[] = [
+  {id:"all",emoji:"✦",ko:"전체",en:"All"},{id:"food",emoji:"🍽️",ko:"식품",en:"Food"},{id:"living",emoji:"🧺",ko:"생활",en:"Living"},{id:"kitchen",emoji:"🍳",ko:"주방",en:"Kitchen"},{id:"beauty",emoji:"💄",ko:"뷰티",en:"Beauty"},{id:"fashion",emoji:"👕",ko:"패션",en:"Fashion"},{id:"digital",emoji:"💻",ko:"디지털",en:"Digital"},
+];
 
 const copy = {
   ko: {
@@ -32,9 +37,9 @@ const copy = {
 };
 
 const initialProducts: Product[] = [
-  { emoji: "🍳", ko: "올스텐 인덕션 프라이팬 2종", en: "All-steel induction pan set", price: 39900, original: 79800, joined: 84, time: [0, 18], color: "peach", seller: "키친웍스" },
-  { emoji: "☕", ko: "스페셜티 드립백 커피 30개", en: "Specialty drip coffee 30-pack", price: 24900, original: 49800, joined: 72, time: [1, 6], color: "cream", seller: "모닝로스터스" },
-  { emoji: "🧺", ko: "호텔 수건 프리미엄 10장", en: "Premium hotel towels, set of 10", price: 29900, original: 59800, joined: 96, time: [0, 9], color: "mint", seller: "코지라이프" },
+  { emoji: "🍳", category:"kitchen", ko: "올스텐 인덕션 프라이팬 2종", en: "All-steel induction pan set", price: 39900, original: 79800, joined: 84, time: [0, 18], color: "peach", seller: "키친웍스" },
+  { emoji: "☕", category:"food", ko: "스페셜티 드립백 커피 30개", en: "Specialty drip coffee 30-pack", price: 24900, original: 49800, joined: 72, time: [1, 6], color: "cream", seller: "모닝로스터스" },
+  { emoji: "🧺", category:"living", ko: "호텔 수건 프리미엄 10장", en: "Premium hotel towels, set of 10", price: 29900, original: 59800, joined: 96, time: [0, 9], color: "mint", seller: "코지라이프" },
 ];
 
 const won = (n: number, lang: Language) => lang === "ko" ? `${n.toLocaleString("ko-KR")}원` : `₩${n.toLocaleString("en-US")}`;
@@ -47,6 +52,7 @@ const priceAtCount = (product: Product, count: number) => {
 export default function Home() {
   const [lang, setLang] = useState<Language>("ko");
   const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [activeCategory, setActiveCategory] = useState<"all" | Category>("all");
   const [selected, setSelected] = useState(0);
   const [dealOpen, setDealOpen] = useState(false);
   const [dealSuccess, setDealSuccess] = useState(false);
@@ -63,6 +69,7 @@ export default function Home() {
   const product = products[selected];
   const previewPrice = useMemo(() => priceAtCount(product, previewCount), [product, previewCount]);
   const deposit = useMemo(() => previewPrice * quantity / 2, [previewPrice, quantity]);
+  const visibleProducts = products.map((p,index)=>({p,index})).filter(({p})=>activeCategory==="all"||p.category===activeCategory);
 
   const openDeal = (index: number) => { setSelected(index); setQuantity(1); setPreviewCount(Math.max(1, products[index].joined)); setDealSuccess(false); setDealOpen(true); };
   const signup = (e: FormEvent<HTMLFormElement>) => {
@@ -72,8 +79,8 @@ export default function Home() {
   const addProduct = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault(); const data = new FormData(e.currentTarget); const name = String(data.get("product") || ""); const seller = String(data.get("seller") || "");
     if (!name || !seller || !retail) { setFormError(true); return; }
-    const category = String(data.get("category") || "📦"); const duration = Number(data.get("duration") || 3);
-    setProducts(prev => [{ emoji: category, ko: name, en: name, price: retail / 2, original: retail, joined: 0, time: [duration, 0], color: "lavender", seller }, ...prev]);
+    const category = String(data.get("category") || "living") as Category; const duration = Number(data.get("duration") || 3); const emoji=categories.find(c=>c.id===category)?.emoji||"📦";
+    setProducts(prev => [{ emoji, category, ko: name, en: name, price: retail / 2, original: retail, joined: 0, time: [duration, 0], color: "lavender", seller }, ...prev]); setActiveCategory("all");
     setFormError(false); setSellerSuccess(true);
   };
 
@@ -89,8 +96,8 @@ export default function Home() {
 
     <section className="hero" id="top"><div className="heroCopy"><span className="eyebrow"><i /> {t.eyebrow}</span><h1>{t.heroTitle}</h1><p>{t.heroBody}</p><button className="primary" onClick={() => openDeal(Math.min(2, products.length - 1))}>{t.seeDeal} <span>→</span></button><div className="guarantee"><span>✓</span>{t.guarantee}</div></div><div className="heroCard" role="presentation"><div className="floatBadge"><b>96</b><span>/ 100</span><small>{lang === "ko" ? "거의 다 모였어요!" : "Almost there!"}</small></div><div className="productVisual">🧺</div><div className="priceTag"><small>{t.group}</small><strong>29,900<span>{lang === "ko" ? "원" : " KRW"}</span></strong></div><div className="dots"><span /><span /><span /></div></div></section>
 
-    <section className="deals section" id="deals"><div className="sectionHead"><div><span className="sectionKicker">LIVE DEALS</span><h2>{t.live}</h2></div><a href="#deals">{t.all} →</a></div><div className="dealGrid">
-      {products.map((p, index) => { const currentPrice=priceAtCount(p,Math.max(1,p.joined)); const discount=Math.round((1-currentPrice/p.original)*100); return <article className="dealCard" key={`${p.ko}-${index}`} onClick={() => openDeal(index)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && openDeal(index)}><div className={`dealImage ${p.color}`}><span className="dealBadge">{100-p.joined}{t.left}</span><span className="emoji">{p.emoji}</span><button aria-label="찜하기" onClick={(e) => e.stopPropagation()}>♡</button></div><div className="dealInfo"><div className="seller">{p.seller}</div><h3>{lang === "ko" ? p.ko : p.en}</h3><div className="prices"><b>{discount}%</b><strong>{won(currentPrice, lang)}</strong><del>{won(p.original, lang)}</del></div><div className="progressLabel"><strong>{p.joined}{t.people}</strong><span>{p.joined}% {t.achieved}</span></div><div className="progress"><span style={{width:`${p.joined}%`}} /></div><div className="timer">◷ {t.deadline} <b>{p.time[0]}{t.days} {p.time[1]}{t.hours}</b></div></div></article>})}
+    <section className="deals section" id="deals"><div className="sectionHead"><div><span className="sectionKicker">LIVE DEALS</span><h2>{t.live}</h2></div><a href="#deals">{t.all} →</a></div><div className="categoryBar" aria-label={lang==="ko"?"상품 카테고리":"Product categories"}>{categories.map(c=><button key={c.id} className={activeCategory===c.id?"active":""} onClick={()=>setActiveCategory(c.id)}><span>{c.emoji}</span>{lang==="ko"?c.ko:c.en}</button>)}</div><div className="dealGrid">
+      {visibleProducts.map(({p,index}) => { const currentPrice=priceAtCount(p,Math.max(1,p.joined)); const discount=Math.round((1-currentPrice/p.original)*100); return <article className="dealCard" key={`${p.ko}-${index}`} onClick={() => openDeal(index)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && openDeal(index)}><div className={`dealImage ${p.color}`}><span className="dealBadge">{100-p.joined}{t.left}</span><span className="emoji">{p.emoji}</span><button aria-label="찜하기" onClick={(e) => e.stopPropagation()}>♡</button></div><div className="dealInfo"><div className="seller">{p.seller}</div><h3>{lang === "ko" ? p.ko : p.en}</h3><div className="prices"><b>{discount}%</b><strong>{won(currentPrice, lang)}</strong><del>{won(p.original, lang)}</del></div><div className="progressLabel"><strong>{p.joined}{t.people}</strong><span>{p.joined}% {t.achieved}</span></div><div className="progress"><span style={{width:`${p.joined}%`}} /></div><div className="timer">◷ {t.deadline} <b>{p.time[0]}{t.days} {p.time[1]}{t.hours}</b></div></div></article>})}
     </div></section>
 
     <section className="how section" id="how"><div className="howIntro"><span className="sectionKicker">HOW IT WORKS</span><h2>{t.stepsTitle}</h2></div><div className="steps">{[["01","⌕",t.step1,t.step1Body],["02","▣",t.step2,t.step2Body],["03","✓",t.step3,t.step3Body]].map((s,i)=><div className="step" key={s[0]}><span className="stepNumber">{s[0]}</span><div className={`stepIcon step${i}`}>{s[1]}</div><div><h3>{s[2]}</h3><p>{s[3]}</p></div></div>)}</div></section>
@@ -100,6 +107,6 @@ export default function Home() {
 
     {accountOpen && <div className="overlay" onMouseDown={()=>setAccountOpen(false)}><section className="sheet accountSheet" onMouseDown={e=>e.stopPropagation()} role="dialog" aria-modal="true"><button className="sheetClose" onClick={()=>setAccountOpen(false)}>×</button><span className="sectionKicker">JOIN BAEKDEAL</span><h2>{t.accountTitle}</h2><p className="sheetProduct">{t.accountBody}</p><div className="roleGrid"><button className={role==="buyer"?"active":""} onClick={()=>setRole("buyer")}><span>🛍️</span><b>{t.buyer}</b><small>{t.buyerDesc}</small></button><button className={role==="seller"?"active":""} onClick={()=>setRole("seller")}><span>🏪</span><b>{t.seller}</b><small>{t.sellerDesc}</small></button></div><form onSubmit={signup} className="form"><label>{t.name}<input name="name" required placeholder={role==="seller"?(lang==="ko"?"예: 백딜상회":"e.g. Baekdeal Store"):(lang==="ko"?"이름 입력":"Enter your name")} /></label><label>{t.email}<input name="email" type="email" required placeholder="name@example.com" /></label><button className="primary joinButton">{t.createAccount}</button></form></section></div>}
 
-    {sellerOpen && <div className="overlay" onMouseDown={()=>setSellerOpen(false)}><section className="sheet sellerSheet" onMouseDown={e=>e.stopPropagation()} role="dialog" aria-modal="true"><button className="sheetClose" onClick={()=>setSellerOpen(false)}>×</button>{!sellerSuccess ? <><span className="sectionKicker">SELLER CENTER</span><h2>{t.productTitle}</h2><p className="sheetProduct">{t.productBody}</p><form onSubmit={addProduct} className="form sellerForm"><div className="formRow"><label>{t.productName}<input name="product" placeholder={lang==="ko"?"등록할 상품명":"Product name"} /></label><label>{t.sellerName}<input name="seller" defaultValue={account?.name || ""} /></label></div><div className="formRow"><label>{t.originalPrice}<input name="retail" type="number" min="1000" step="100" value={retail} onChange={e=>setRetail(Number(e.target.value))} /></label><label>{t.dealPrice}<output>{won(retail/2,lang)}</output></label></div><div className="formRow"><label>{t.category}<select name="category"><option value="📦">📦 {lang==="ko"?"생활":"Living"}</option><option value="🍽️">🍽️ {lang==="ko"?"식품":"Food"}</option><option value="💄">💄 {lang==="ko"?"뷰티":"Beauty"}</option><option value="👕">👕 {lang==="ko"?"패션":"Fashion"}</option><option value="💻">💻 {lang==="ko"?"디지털":"Digital"}</option></select></label><label>{t.deadlineLabel}<select name="duration"><option value="3">3{t.days}</option><option value="5">5{t.days}</option><option value="7">7{t.days}</option></select></label></div>{formError&&<p className="formError">{t.required}</p>}<p className="notice">ⓘ {t.demo}</p><button className="primary joinButton">{t.register}</button></form></> : <div className="success"><div>✓</div><h2>{t.registered}</h2><p>{t.registeredBody}</p><button className="primary" onClick={()=>setSellerOpen(false)}>{t.close}</button></div>}</section></div>}
+    {sellerOpen && <div className="overlay" onMouseDown={()=>setSellerOpen(false)}><section className="sheet sellerSheet" onMouseDown={e=>e.stopPropagation()} role="dialog" aria-modal="true"><button className="sheetClose" onClick={()=>setSellerOpen(false)}>×</button>{!sellerSuccess ? <><span className="sectionKicker">SELLER CENTER</span><h2>{t.productTitle}</h2><p className="sheetProduct">{t.productBody}</p><form onSubmit={addProduct} className="form sellerForm"><div className="formRow"><label>{t.productName}<input name="product" placeholder={lang==="ko"?"등록할 상품명":"Product name"} /></label><label>{t.sellerName}<input name="seller" defaultValue={account?.name || ""} /></label></div><div className="formRow"><label>{t.originalPrice}<input name="retail" type="number" min="1000" step="100" value={retail} onChange={e=>setRetail(Number(e.target.value))} /></label><label>{t.dealPrice}<output>{won(retail/2,lang)}</output></label></div><div className="formRow"><label>{t.category}<select name="category">{categories.filter(c=>c.id!=="all").map(c=><option key={c.id} value={c.id}>{c.emoji} {lang==="ko"?c.ko:c.en}</option>)}</select></label><label>{t.deadlineLabel}<select name="duration"><option value="3">3{t.days}</option><option value="5">5{t.days}</option><option value="7">7{t.days}</option></select></label></div>{formError&&<p className="formError">{t.required}</p>}<p className="notice">ⓘ {t.demo}</p><button className="primary joinButton">{t.register}</button></form></> : <div className="success"><div>✓</div><h2>{t.registered}</h2><p>{t.registeredBody}</p><button className="primary" onClick={()=>setSellerOpen(false)}>{t.close}</button></div>}</section></div>}
   </main>;
 }
