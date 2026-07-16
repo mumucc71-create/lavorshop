@@ -4,13 +4,13 @@ import { FormEvent, useMemo, useState } from "react";
 
 type Language = "ko" | "en";
 type Role = "buyer" | "seller";
-type Category = "food" | "living" | "kitchen" | "beauty" | "fashion" | "digital";
+type Category = "food" | "living" | "kitchen" | "beauty" | "fashion" | "digital" | "clearanceFruit" | "clearanceFood" | "clearanceGoods";
 type Product = { emoji: string; category: Category; ko: string; en: string; price: number; original: number; joined: number; manualJoined: number; time: [number, number]; color: string; seller: string };
 type Alternative = { name:string; price:number; link:string; image:string; reason:string; seller:string; sellerRegistered:boolean; contactRequested:boolean };
 type Recommendation = { name:string; category:Category; targetPrice:number; reason:string; link:string; image:string; votes:number; status:"open"|"contacted"|"alternative"; alternative?:Alternative };
 
 const categories: {id: "all" | Category; emoji: string; ko: string; en: string}[] = [
-  {id:"all",emoji:"✦",ko:"전체",en:"All"},{id:"food",emoji:"🍽️",ko:"식품",en:"Food"},{id:"living",emoji:"🧺",ko:"생활",en:"Living"},{id:"kitchen",emoji:"🍳",ko:"주방",en:"Kitchen"},{id:"beauty",emoji:"💄",ko:"뷰티",en:"Beauty"},{id:"fashion",emoji:"👕",ko:"패션",en:"Fashion"},{id:"digital",emoji:"💻",ko:"디지털",en:"Digital"},
+  {id:"all",emoji:"✦",ko:"전체",en:"All"},{id:"food",emoji:"🍽️",ko:"식품",en:"Food"},{id:"living",emoji:"🧺",ko:"생활",en:"Living"},{id:"kitchen",emoji:"🍳",ko:"주방",en:"Kitchen"},{id:"beauty",emoji:"💄",ko:"뷰티",en:"Beauty"},{id:"fashion",emoji:"👕",ko:"패션",en:"Fashion"},{id:"digital",emoji:"💻",ko:"디지털",en:"Digital"},{id:"clearanceFruit",emoji:"🍎",ko:"땡처리 과일",en:"Clearance fruit"},{id:"clearanceFood",emoji:"🥡",ko:"땡처리 음식",en:"Clearance food"},{id:"clearanceGoods",emoji:"⚡",ko:"땡처리 제품",en:"Clearance goods"},
 ];
 
 const copy = {
@@ -39,12 +39,15 @@ const copy = {
 };
 
 const initialProducts: Product[] = [
+  { emoji: "🍎", category:"clearanceFruit", ko: "흠집 사과 실속형 5kg", en: "Value blemished apples 5kg", price: 19900, original: 39800, joined: 63, manualJoined:0, time: [0, 12], color: "peach", seller: "햇살과수원 · 땡처리" },
+  { emoji: "🥡", category:"clearanceFood", ko: "유통기한 임박 간편식 10팩", en: "Short-dated ready meals, 10 packs", price: 22500, original: 45000, joined: 51, manualJoined:0, time: [0, 8], color: "cream", seller: "푸드마켓 · 땡처리" },
+  { emoji: "⚡", category:"clearanceGoods", ko: "시즌마감 생활용품 랜덤박스", en: "End-of-season household goods box", price: 14900, original: 29800, joined: 39, manualJoined:0, time: [1, 2], color: "lavender", seller: "창고정리몰 · 땡처리" },
   { emoji: "🍳", category:"kitchen", ko: "올스텐 인덕션 프라이팬 2종", en: "All-steel induction pan set", price: 39900, original: 79800, joined: 84, manualJoined:0, time: [0, 18], color: "peach", seller: "키친웍스" },
   { emoji: "☕", category:"food", ko: "스페셜티 드립백 커피 30개", en: "Specialty drip coffee 30-pack", price: 24900, original: 49800, joined: 72, manualJoined:0, time: [1, 6], color: "cream", seller: "모닝로스터스" },
   { emoji: "🧺", category:"living", ko: "호텔 수건 프리미엄 10장", en: "Premium hotel towels, set of 10", price: 29900, original: 59800, joined: 96, manualJoined:0, time: [0, 9], color: "mint", seller: "코지라이프" },
 ];
 const initialRecommendations: Recommendation[]=[{name:"무선 물걸레 청소기",category:"living",targetPrice:89000,reason:"아이 있는 집에서 함께 저렴하게 사고 싶어요.",link:"",image:"",votes:28,status:"open"},{name:"대용량 견과 선물세트",category:"food",targetPrice:35000,reason:"명절 단체 선물용 공구를 원해요.",link:"",image:"",votes:17,status:"open"}];
-const aiAlternatives:Record<Category,Omit<Alternative,"reason"|"contactRequested">>={food:{name:"프리미엄 건강 간식 세트",price:32900,link:"https://shopping.naver.com/",image:"",seller:"마켓온유",sellerRegistered:false},living:{name:"무선 듀얼스핀 물걸레 청소기",price:79900,link:"https://www.coupang.com/",image:"",seller:"클린홈 스토어",sellerRegistered:false},kitchen:{name:"올스텐 멀티팬 3종 세트",price:44900,link:"https://shopping.naver.com/",image:"",seller:"리빙팩토리",sellerRegistered:false},beauty:{name:"저자극 데일리 스킨케어 세트",price:39900,link:"https://shopping.naver.com/",image:"",seller:"더뷰티랩",sellerRegistered:false},fashion:{name:"베이직 코튼 데일리웨어",price:29900,link:"https://www.coupang.com/",image:"",seller:"웨어온",sellerRegistered:false},digital:{name:"고속충전 스마트 액세서리 세트",price:35900,link:"https://www.coupang.com/",image:"",seller:"테크모아",sellerRegistered:false}};
+const aiAlternatives:Record<Category,Omit<Alternative,"reason"|"contactRequested">>={food:{name:"프리미엄 건강 간식 세트",price:32900,link:"https://shopping.naver.com/",image:"",seller:"마켓온유",sellerRegistered:false},living:{name:"무선 듀얼스핀 물걸레 청소기",price:79900,link:"https://www.coupang.com/",image:"",seller:"클린홈 스토어",sellerRegistered:false},kitchen:{name:"올스텐 멀티팬 3종 세트",price:44900,link:"https://shopping.naver.com/",image:"",seller:"리빙팩토리",sellerRegistered:false},beauty:{name:"저자극 데일리 스킨케어 세트",price:39900,link:"https://shopping.naver.com/",image:"",seller:"더뷰티랩",sellerRegistered:false},fashion:{name:"베이직 코튼 데일리웨어",price:29900,link:"https://www.coupang.com/",image:"",seller:"웨어온",sellerRegistered:false},digital:{name:"고속충전 스마트 액세서리 세트",price:35900,link:"https://www.coupang.com/",image:"",seller:"테크모아",sellerRegistered:false},clearanceFruit:{name:"못난이 제철 과일 혼합박스",price:18900,link:"https://shopping.naver.com/",image:"",seller:"산지직송마켓",sellerRegistered:false},clearanceFood:{name:"임박상품 간편식 꾸러미",price:21900,link:"https://shopping.naver.com/",image:"",seller:"알뜰푸드",sellerRegistered:false},clearanceGoods:{name:"재고정리 생활용품 세트",price:15900,link:"https://shopping.naver.com/",image:"",seller:"창고클리어",sellerRegistered:false}};
 
 const won = (n: number, lang: Language) => lang === "ko" ? `${n.toLocaleString("ko-KR")}원` : `₩${n.toLocaleString("en-US")}`;
 const priceAtCount = (product: Product, count: number) => {
