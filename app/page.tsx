@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Language = "ko" | "en";
 type Role = "buyer" | "seller";
@@ -82,11 +82,15 @@ export default function Home() {
   const [sellerSuccess, setSellerSuccess] = useState(false);
   const [formError, setFormError] = useState(false);
   const [retail, setRetail] = useState(60000);
+  const [referrer,setReferrer]=useState("");
+  const [shareCopied,setShareCopied]=useState(false);
   const t = copy[lang];
   const product = products[selected];
   const previewPrice = useMemo(() => priceAtCount(product, previewCount), [product, previewCount]);
   const deposit = useMemo(() => previewPrice * quantity / 2, [previewPrice, quantity]);
   const visibleProducts = products.map((p,index)=>({p,index})).filter(({p})=>activeCategory==="all"||p.category===activeCategory);
+
+  useEffect(()=>{const ref=new URLSearchParams(window.location.search).get("ref");if(ref)setReferrer(ref.slice(0,50));},[]);
 
   const openDeal = (index: number) => { setSelected(index); setQuantity(1); setOrderType("individual"); setResaleAgreed(false); setGroupNameReady(false); setGroupContactReady(false); setPreviewCount(Math.max(1, products[index].joined)); setDealSuccess(false); setDealOpen(true); };
   const signup = (e: FormEvent<HTMLFormElement>) => {
@@ -107,6 +111,7 @@ export default function Home() {
   };
   const addRecommendation=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const data=new FormData(e.currentTarget);const name=String(data.get("recommendName")||"");const reason=String(data.get("recommendReason")||"");const targetPrice=Number(data.get("targetPrice"));if(!name||!reason||!targetPrice||!data.get("referenceLink")){setFormError(true);return;}setRecommendations(prev=>[{name,reason,targetPrice,category:String(data.get("recommendCategory")) as Category,link:String(data.get("referenceLink")),image:String(data.get("imageLink")||""),votes:1,status:"open"},...prev]);setFormError(false);setRecommendSuccess(true);};
   const pickExternalSeller=(index:number)=>setRecommendations(prev=>prev.map((r,i)=>i===index&&r.alternative?{...r,alternative:{...r.alternative,contactRequested:true}}:r));
+  const copyPromotionLink=async()=>{if(!account?.name)return;const url=`${window.location.origin}${window.location.pathname}?ref=${encodeURIComponent(account.name)}#deals`;await navigator.clipboard.writeText(url);setShareCopied(true);};
 
   return <main>
     <header className="topbar">
@@ -123,6 +128,8 @@ export default function Home() {
     <section className="deals section" id="deals"><div className="sectionHead"><div><span className="sectionKicker">LIVE DEALS</span><h2>{t.live}</h2></div><a href="#deals">{t.all} →</a></div><div className="categoryBar" aria-label={lang==="ko"?"상품 카테고리":"Product categories"}>{categories.map(c=><button key={c.id} className={activeCategory===c.id?"active":""} onClick={()=>setActiveCategory(c.id)}><span>{c.emoji}</span>{lang==="ko"?c.ko:c.en}</button>)}</div><div className="dealGrid">
       {visibleProducts.map(({p,index}) => { const currentPrice=priceAtCount(p,Math.max(1,p.joined)); const discount=Math.round((1-currentPrice/p.original)*100); return <article className="dealCard" key={`${p.ko}-${index}`} onClick={() => openDeal(index)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && openDeal(index)}><div className={`dealImage ${p.color}`}><span className="dealBadge">{100-p.joined}{t.left}</span><span className="emoji">{p.emoji}</span><button aria-label="찜하기" onClick={(e) => e.stopPropagation()}>♡</button></div><div className="dealInfo"><div className="seller">{p.seller}</div><h3>{lang === "ko" ? p.ko : p.en}</h3><div className="prices"><b>{discount}%</b><strong>{won(currentPrice, lang)}</strong><del>{won(p.original, lang)}</del></div><div className="progressLabel"><strong>{p.joined}{t.people}{p.manualJoined>0&&<em> · {t.manualIncluded} {p.manualJoined}</em>}</strong><span>{p.joined}% {t.achieved}</span></div><div className="progress"><span style={{width:`${p.joined}%`}} /></div><div className="timer">◷ {t.deadline} <b>{p.time[0]}{t.days} {p.time[1]}{t.hours}</b></div></div></article>})}
     </div></section>
+
+    <section className="recommendSection section" id="promotion"><div className="sectionHead"><div><span className="sectionKicker">PROMOTION PAYBACK</span><h2>{lang==="ko"?"공구 홍보하고 2% 페이백":"Share a deal and earn 2%"}</h2><p>{lang==="ko"?"내 홍보 URL을 타고 온 사람이 구매하면 실제 결제금액의 2%를 홍보자에게 지급합니다. 주문당 최초 홍보자 1명만 인정됩니다.":"When someone purchases through your URL, you receive 2% of the actual payment. Only the first referrer is credited per order."}</p></div>{account?.role==="buyer"&&<button className="primary compact" onClick={copyPromotionLink}>{shareCopied?(lang==="ko"?"URL 복사 완료":"URL copied"):(lang==="ko"?"내 홍보 URL 복사":"Copy my promotion URL")}</button>}</div>{referrer&&<div className="contactDone">✓ {lang==="ko"?`홍보자 ${referrer}의 링크로 방문했습니다 · 구매 시 2% 지급`:`Referred by ${referrer} · 2% paid on purchase`}</div>}</section>
 
     <section className="recommendSection section" id="recommend"><div className="sectionHead"><div><span className="sectionKicker">CUSTOMER REQUESTS</span><h2>{t.recommendList}</h2><p>{t.recommendListBody}</p></div>{account?.role==="buyer"&&<button className="primary compact" onClick={()=>{setRecommendSuccess(false);setRecommendOpen(true);}}>＋ {t.recommendButton}</button>}</div><div className="recommendGrid">{recommendations.map((r,i)=>{const cat=categories.find(c=>c.id===r.category);return <article className="recommendCard" key={`${r.name}-${i}`}>{r.image&&<img className="recommendImage" src={r.image} alt={r.name}/>}<div className="recommendTop"><span>{cat?.emoji}</span><small>{lang==="ko"?cat?.ko:cat?.en}</small></div><h3>{r.name}</h3><p>{r.reason}</p>{r.link&&<a className="originalLink" href={r.link} target="_blank" rel="noreferrer">↗ {t.originalDetail}</a>}{r.status==="alternative"&&r.alternative&&<div className="alternativeBox"><span>AI · {t.sellerSuggestion}</span>{r.alternative.image&&<img src={r.alternative.image} alt={r.alternative.name}/>}<div><b>{r.alternative.name}</b><strong>{won(r.alternative.price,lang)}</strong></div><p>{r.alternative.reason}</p><div className="externalSeller"><b>{r.alternative.seller}</b><small>{t.unregisteredSeller}</small></div><a href={r.alternative.link} target="_blank" rel="noreferrer">↗ {t.originalDetail}</a>{r.alternative.contactRequested?<div className="contactDone">✓ {lang==="ko"?"운영자가 AI 추천 판매자에게 연락할 예정입니다.":"The operator will contact the AI-recommended seller."}</div>:<button className="pickSellerButton" onClick={()=>pickExternalSeller(i)}>{lang==="ko"?"이 상품으로 다시 공구 제안하기":"Propose a deal for this product"}</button>}</div>}<div><span>{lang==="ko"?"희망가 ":"Desired "}<b>{won(r.targetPrice,lang)}</b></span><button onClick={()=>setRecommendations(prev=>prev.map((item,j)=>j===i?{...item,votes:item.votes+1}:item))}>♡ {t.wantToo} · {r.votes}{t.wanted}</button></div>{r.status==="open"&&<div className="contactDone">⏳ {lang==="ko"?"판매자 수락 대기중":"Waiting for seller acceptance"}</div>}</article>})}</div></section>
 
