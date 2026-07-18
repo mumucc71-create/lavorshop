@@ -4,7 +4,13 @@ export type ServiceCategory =
   | "applianceCleaning"
   | "repairInstall"
   | "interior"
-  | "freight";
+  | "freight"
+  | "insurance"
+  | "judicialScrivener"
+  | "taxAccounting"
+  | "realEstateAuction"
+  | "laborAdmin"
+  | "patent";
 
 export type DiscountMode =
   | "group"
@@ -33,6 +39,7 @@ export type ServiceDeal = {
   status: DealStatus;
   provider?: string;
   verified?: boolean;
+  credential?: string;
   desiredPrice?: number;
   initialQuote?: number;
   route?: string;
@@ -63,6 +70,8 @@ export type ProviderDealInput = {
   detail: string;
   target: number;
   discountRate: number;
+  providerName: string;
+  credential: string;
   route?: string;
   reverseRoute?: string;
   vehicleTon?: string;
