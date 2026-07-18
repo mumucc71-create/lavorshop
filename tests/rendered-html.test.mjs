@@ -43,6 +43,7 @@ test("필수 서비스 카테고리와 안전장치를 표시한다", async () =
   const response = await render();
   const html = await response.text();
   const serviceData = await readFile(new URL("../app/service-data.ts", import.meta.url), "utf8");
+  const marketplace = await readFile(new URL("../app/service-marketplace.tsx", import.meta.url), "utf8");
 
   for (const category of [
     "이사·용달",
@@ -58,6 +59,15 @@ test("필수 서비스 카테고리와 안전장치를 표시한다", async () =
   for (const category of ["보험 상담", "법무·법무사", "세무·회계", "부동산·경매", "노무·행정", "특허·상표"]) {
     assert.match(serviceData, new RegExp(category));
   }
+
+  for (const category of ["취업·직무", "과외·교육", "취미·자기계발", "외주", "이벤트·뷰티", "디자인·개발", "자동차", "반려동물"]) {
+    assert.match(serviceData, new RegExp(category));
+  }
+
+  assert.match(marketplace, /이 서비스가 이미 있습니다/);
+  assert.match(marketplace, /이미 당신의 서비스를 기다리는 사람들이 있습니다/);
+  assert.match(marketplace, /아니요, 새로 만들게요/);
+  assert.match(marketplace, /아니요, 새로 등록할게요/);
 
   assert.match(html, /최초 견적/);
   assert.match(html, /자격 인증/);

@@ -10,7 +10,15 @@ export type ServiceCategory =
   | "taxAccounting"
   | "realEstateAuction"
   | "laborAdmin"
-  | "patent";
+  | "patent"
+  | "careerJob"
+  | "tutoringEducation"
+  | "hobbyGrowth"
+  | "outsourcing"
+  | "eventBeauty"
+  | "designDevelopment"
+  | "automotive"
+  | "pets";
 
 export type DiscountMode =
   | "group"
