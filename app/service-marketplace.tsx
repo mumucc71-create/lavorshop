@@ -17,6 +17,18 @@ const describesSameService = (left: string, right: string) => {
   const matchedWords = leftWords.filter((word) => rightText.includes(word));
   return matchedWords.length >= Math.min(2, leftWords.length) && matchedWords.length > 0;
 };
+const referencePrice = (deal: ServiceDeal) => deal.initialQuote || deal.desiredPrice || 100000;
+const dealPriceFloor = (deal: ServiceDeal) => deal.priceFloor ?? Math.round(referencePrice(deal) * 0.75 / 1000) * 1000;
+const dealPriceCeiling = (deal: ServiceDeal) => deal.priceCeiling ?? Math.round(referencePrice(deal) * 1.3 / 1000) * 1000;
+const priceRangesOverlap = (floor: number | undefined, ceiling: number | undefined, deal: ServiceDeal) => {
+  if (!floor || !ceiling) return true;
+  return Math.max(floor, dealPriceFloor(deal)) <= Math.min(ceiling, dealPriceCeiling(deal));
+};
+const currentTier = (deal: ServiceDeal) => {
+  const tiers = [...(deal.priceTiers ?? [])].sort((left, right) => left.people - right.people);
+  return [...tiers].reverse().find((tier) => deal.joined >= tier.people) ?? tiers[0];
+};
+const targetTier = (deal: ServiceDeal) => [...(deal.priceTiers ?? [])].sort((left, right) => right.people - left.people)[0];
 
 export default function ServiceMarketplace() {
   const [deals, setDeals] = useState<ServiceDeal[]>(initialServiceDeals);
@@ -36,6 +48,8 @@ export default function ServiceMarketplace() {
   const [pendingRequest, setPendingRequest] = useState<ServiceRequestInput | null>(null);
   const [providerMatch, setProviderMatch] = useState<ServiceDeal | null>(null);
   const [pendingProvider, setPendingProvider] = useState<ProviderDealInput | null>(null);
+  const [priceSetupKind, setPriceSetupKind] = useState<"customer" | "provider" | null>(null);
+  const [priceError, setPriceError] = useState("");
 
   const visibleDeals = useMemo(
     () => accessGranted && activeCategory !== "all"
@@ -52,6 +66,8 @@ export default function ServiceMarketplace() {
       id: Date.now(), source: "customer", mode: "priceRequest", discountRate: 0,
       approved: 0, target: 3, joined: 1, pending: 0, status: "recruiting", ...input,
     }, ...current]);
+    setPendingRequest(null);
+    setPriceSetupKind(null);
     setSuccessMessage("새 공동계약 요청이 비공개로 등록됐어요. 조건이 일치하는 고객과 인증 전문가에게만 안내됩니다.");
     setRequestOpen(true);
   };
@@ -62,8 +78,30 @@ export default function ServiceMarketplace() {
       id: Date.now(), source: "provider", approved: 0, joined: 0, pending: 0,
       status: "recruiting", provider: providerName, credential, verified: true, initialQuote: 0, ...dealInput,
     }, ...current]);
+    setPendingProvider(null);
+    setPriceSetupKind(null);
     setSuccessMessage("새 공동계약 서비스가 비공개로 등록됐어요. 조건이 일치하는 고객에게만 안내됩니다.");
     setProviderOpen(true);
+  };
+
+  const findRequestMatch = (input: ServiceRequestInput) => {
+    const match = deals.find((deal) => deal.category === input.category && deal.status === "recruiting" && describesSameService(input.title, deal.title) && priceRangesOverlap(input.priceFloor, input.priceCeiling, deal));
+    if (match) {
+      setPendingRequest(input);
+      setRequestMatch(match);
+      return;
+    }
+    createServiceRequest(input);
+  };
+
+  const findProviderMatch = (input: ProviderDealInput) => {
+    const match = deals.find((deal) => deal.source === "customer" && deal.category === input.category && deal.status === "recruiting" && describesSameService(input.title, deal.title) && priceRangesOverlap(input.priceFloor, input.priceCeiling, deal));
+    if (match) {
+      setPendingProvider(input);
+      setProviderMatch(match);
+      return;
+    }
+    createProviderDeal(input);
   };
 
   const addServiceRequest = (event: FormEvent<HTMLFormElement>) => {
@@ -77,14 +115,10 @@ export default function ServiceMarketplace() {
       detail: String(data.get("detail")),
       desiredPrice: Number(data.get("desiredPrice")),
     };
-    const match = deals.find((deal) => deal.category === input.category && deal.status === "recruiting" && describesSameService(input.title, deal.title));
-    if (match) {
-      setPendingRequest(input);
-      setRequestMatch(match);
-      setRequestOpen(false);
-      return;
-    }
-    createServiceRequest(input);
+    setPendingRequest(input);
+    setPriceError("");
+    setPriceSetupKind("customer");
+    setRequestOpen(false);
   };
 
   const addProviderDeal = (event: FormEvent<HTMLFormElement>) => {
@@ -108,14 +142,46 @@ export default function ServiceMarketplace() {
       radius: Number(data.get("radius")) || undefined,
       projectPeriod: String(data.get("projectPeriod") || "") || undefined,
     };
-    const match = deals.find((deal) => deal.source === "customer" && deal.category === input.category && deal.status === "recruiting" && describesSameService(input.title, deal.title));
-    if (match) {
-      setPendingProvider(input);
-      setProviderMatch(match);
-      setProviderOpen(false);
+    setPendingProvider(input);
+    setPriceError("");
+    setPriceSetupKind("provider");
+    setProviderOpen(false);
+  };
+
+  const submitCustomerPriceRange = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!pendingRequest) return;
+    const data = new FormData(event.currentTarget);
+    const priceFloor = Number(data.get("priceFloor"));
+    const priceCeiling = Number(data.get("priceCeiling"));
+    if (priceFloor > pendingRequest.desiredPrice || pendingRequest.desiredPrice > priceCeiling) {
+      setPriceError("희망가격은 하한과 상한 사이에 있어야 합니다.");
       return;
     }
-    createProviderDeal(input);
+    const input = { ...pendingRequest, priceFloor, priceCeiling };
+    setPriceSetupKind(null);
+    setPriceError("");
+    findRequestMatch(input);
+  };
+
+  const submitProviderPriceRange = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!pendingProvider) return;
+    const data = new FormData(event.currentTarget);
+    const priceFloor = Number(data.get("priceFloor"));
+    const priceCeiling = Number(data.get("priceCeiling"));
+    const currentPeople = Number(data.get("currentPeople"));
+    const currentPrice = Number(data.get("currentPrice"));
+    const targetPeople = Number(data.get("targetPeople"));
+    const targetPrice = Number(data.get("targetPrice"));
+    if (priceFloor > targetPrice || targetPrice > currentPrice || currentPrice > priceCeiling || targetPeople <= currentPeople) {
+      setPriceError("목표 인원 가격은 현재 인원 가격보다 낮아야 하며, 모든 가격은 하한과 상한 사이여야 합니다.");
+      return;
+    }
+    const input = { ...pendingProvider, priceFloor, priceCeiling, target: targetPeople, priceTiers: [{ people: currentPeople, price: currentPrice }, { people: targetPeople, price: targetPrice }] };
+    setPriceSetupKind(null);
+    setPriceError("");
+    findProviderMatch(input);
   };
 
   const joinSuggestedRequest = () => {
@@ -124,7 +190,16 @@ export default function ServiceMarketplace() {
     setJoinedIds((current) => current.includes(requestMatch.id) ? current : [...current, requestMatch.id]);
     setRequestMatch(null);
     setPendingRequest(null);
-    setSuccessMessage("기존 공동계약에 함께 참여했어요. 상세정보는 참여 당사자에게만 공개됩니다.");
+    setSuccessMessage("목표 인원 가격을 기다리는 공동계약에 참여했어요. 인원이 모이면 해당 가격으로 상담이 시작됩니다.");
+    setRequestOpen(true);
+  };
+
+  const acceptCurrentExpertPrice = () => {
+    if (!requestMatch) return;
+    setDeals((current) => current.map((deal) => deal.id === requestMatch.id ? { ...deal, joined: deal.joined + 1, pending: deal.pending + 1 } : deal));
+    setRequestMatch(null);
+    setPendingRequest(null);
+    setSuccessMessage("현재 인원 기준 전문가 가격을 선택했어요. 해당 가격 범위로 바로 상담을 진행합니다.");
     setRequestOpen(true);
   };
 
@@ -182,6 +257,12 @@ export default function ServiceMarketplace() {
     setDeals((current) => current.map((deal) => deal.id === rejectDeal.id ? { ...deal, unavailableReason: reason, pending: Math.max(0, deal.pending - 1) } : deal));
     setRejectDeal(null);
   };
+
+  const matchedCurrentTier = requestMatch ? currentTier(requestMatch) : undefined;
+  const matchedTargetTier = requestMatch ? targetTier(requestMatch) : undefined;
+  const sharedPriceFloor = requestMatch && pendingRequest ? Math.max(pendingRequest.priceFloor ?? 0, dealPriceFloor(requestMatch)) : 0;
+  const sharedPriceCeiling = requestMatch && pendingRequest ? Math.min(pendingRequest.priceCeiling ?? Number.MAX_SAFE_INTEGER, dealPriceCeiling(requestMatch)) : 0;
+  const matchedCurrentPriceAllowed = Boolean(matchedCurrentTier && matchedCurrentTier.price >= sharedPriceFloor && matchedCurrentTier.price <= sharedPriceCeiling);
 
   return <main>
     <header className="topbar serviceTopbar">
@@ -267,6 +348,8 @@ export default function ServiceMarketplace() {
       ["⏱","자동 미성사","마감일까지 목표 미달이면 계약 미성사로 자동 처리합니다."],
       ["🙈","비공개 모집","비회원과 조건이 맞지 않는 회원에게는 모집·견적을 노출하지 않습니다."],
       ["⚖️","규정 준수","보험·법무·세무 등은 관련 자격과 보수·광고 규정에 따라 개별 계약합니다."],
+      ["↕️","가격 안전범위","과도한 덤핑과 과다 청구를 막기 위해 승인된 하한·상한 안에서만 제안합니다."],
+      ["👥","인원별 가격","현재 인원 가격과 목표 인원 가격을 함께 기록해 재흥정과 분쟁을 줄입니다."],
     ].map((item) => <article key={item[1]}><span>{item[0]}</span><div><b>{item[1]}</b><p>{item[2]}</p></div></article>)}</div></section>
 
     <footer><div className="brand footerBrand"><span className="brandMark">같이</span><span><strong>같이딜</strong><small>Better services together</small></span></div><p>© 2026 GACHIDEAL · 작동형 데모</p></footer>
@@ -275,9 +358,13 @@ export default function ServiceMarketplace() {
 
     {providerOpen && <div className="overlay" onMouseDown={() => setProviderOpen(false)}><section className="sheet sellerSheet" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="할인 서비스 등록"><button className="sheetClose" onClick={() => setProviderOpen(false)}>×</button>{!successMessage ? <><span className="sectionKicker">VERIFIED PROVIDER</span><h2>할인 서비스 등록</h2><p className="sheetProduct">승인한 고객만 목표 인원에 포함되며 고객별 확정 견적에는 같은 할인율이 적용됩니다.</p><form className="form sellerForm" onSubmit={addProviderDeal}><div className="formRow"><label>할인 방식<select name="mode" value={providerMode} onChange={(event) => setProviderMode(event.target.value as ProviderDealInput["mode"])}><option value="group">모이면 할인</option><option value="roundTrip">왕복 할인</option><option value="neighborhood">동네 묶음 할인</option><option value="emptySlot">빈자리 할인</option></select></label><label>서비스 종류<select name="category">{serviceCategories.filter((item) => item.id !== "all").map((item) => <option value={item.id} key={item.id}>{item.emoji} {item.label}</option>)}</select></label></div><div className="formRow"><label>가능 지역<input name="region" required placeholder="예: 경기 성남시 분당구" /></label><label>가능 날짜·기간<input name="date" required placeholder="예: 2026-08-10 ~ 08-20" /></label></div><div className="formRow"><label>목표 승인 인원<input name="target" type="number" min="2" max="100" defaultValue="3" required /></label><label>할인율<input name="discountRate" type="number" min="1" max="50" defaultValue="10" required /></label></div><label>서비스 제목<input name="title" required placeholder="예: 분당 입주청소 같이 예약" /></label><label>조건 설명<textarea name="detail" required placeholder="적용 범위, 작업 조건, 고객별 견적 방식 등을 적어 주세요." /></label>{providerMode === "roundTrip" && <><div className="formRow"><label>가는 경로<input name="route" required placeholder="대전 → 천안" /></label><label>반대 경로<input name="reverseRoute" required placeholder="천안 → 대전" /></label></div><div className="formRow"><label>차량 톤수<input name="vehicleTon" required placeholder="1톤" /></label><label>작업 종료·상하차 시간<input name="workWindow" required placeholder="12:30 종료 · 각 60분" /></label></div></>}{providerMode === "neighborhood" && <div className="formRow"><label>작업 반경(km)<input name="radius" type="number" min="1" max="30" required /></label><label>공사 기간<input name="projectPeriod" required placeholder="8월 17일~30일" /></label></div>}<p className="notice">ⓘ 목표 미달 시 자동 미성사 처리되며, 목표 달성 전에는 결제를 확정할 수 없습니다.</p><button className="primary joinButton">할인 서비스 등록</button></form></> : <Success message={successMessage} onClose={() => setProviderOpen(false)} />}</section></div>}
 
-    {requestMatch && <div className="overlay"><section className="sheet matchSheet" role="dialog" aria-modal="true" aria-label="기존 공동계약 추천"><span className="sectionKicker">PRIVATE MATCH</span><h2>이 서비스가 이미 있습니다</h2><p className="sheetProduct">같은 조건의 공동계약이 진행 중입니다. 함께 하시겠어요?</p><div className="matchSummary"><span>{serviceCategories.find((item) => item.id === requestMatch.category)?.emoji}</span><div><b>{requestMatch.title}</b><p>{categoryLabel(requestMatch.category)} · {requestMatch.region}</p><small>{requestMatch.date} · 현재 참여 수요 {requestMatch.joined}명</small></div></div><p className="notice">ⓘ 이 추천은 요청을 작성한 회원에게만 1회 표시됩니다. 다른 회원의 이름·연락처·개별 견적은 공개하지 않습니다.</p><div className="matchChoices"><button className="primary" onClick={joinSuggestedRequest}>네, 함께 할게요</button><button className="secondaryAction" onClick={registerSeparateRequest}>아니요, 새로 만들게요</button></div></section></div>}
+    {priceSetupKind === "customer" && pendingRequest && <div className="overlay"><section className="sheet matchSheet" role="dialog" aria-modal="true" aria-label="고객 안전 가격 설정"><button className="sheetClose" onClick={() => { setPriceSetupKind(null); setRequestOpen(true); }}>×</button><span className="sectionKicker">SAFE PRICE</span><h2>안전 가격 범위를 정해주세요</h2><p className="sheetProduct">지나치게 낮거나 높은 제안은 매칭하지 않습니다.</p><form className="form" onSubmit={submitCustomerPriceRange}><div className="formRow"><label>가격 하한<input name="priceFloor" type="number" min="10000" step="1000" defaultValue={Math.max(10000, Math.round(pendingRequest.desiredPrice * 0.8 / 1000) * 1000)} required /></label><label>가격 상한<input name="priceCeiling" type="number" min="10000" step="1000" defaultValue={Math.round(pendingRequest.desiredPrice * 1.25 / 1000) * 1000} required /></label></div><div className="priceRule"><span>내 희망가격</span><b>{formatWon(pendingRequest.desiredPrice)}</b></div>{priceError && <p className="priceError">{priceError}</p>}<p className="notice">ⓘ 희망가격이 안전 범위 안에 있어야 하며, 전문가 가격 범위와 겹칠 때만 공동계약을 추천합니다.</p><button className="primary joinButton">이 범위로 매칭 확인</button></form></section></div>}
 
-    {providerMatch && <div className="overlay"><section className="sheet matchSheet" role="dialog" aria-modal="true" aria-label="대기 수요 추천"><span className="sectionKicker">PRIVATE DEMAND</span><h2>이미 당신의 서비스를 기다리는 사람들이 있습니다</h2><p className="sheetProduct">이 고객 수요와 공동계약 상담을 진행하시겠어요?</p><div className="matchSummary"><span>{serviceCategories.find((item) => item.id === providerMatch.category)?.emoji}</span><div><b>{providerMatch.title}</b><p>{categoryLabel(providerMatch.category)} · {providerMatch.region}</p><small>{providerMatch.date} · 현재 참여 수요 {providerMatch.joined}명</small></div></div><p className="notice">ⓘ 인증된 전문가·업체에게 일치 수요 1건만 보여줍니다. 고객의 이름·연락처·상세주소는 상담 동의 전까지 비공개입니다.</p><div className="matchChoices"><button className="primary" onClick={acceptWaitingDemand}>네, 상담할게요</button><button className="secondaryAction" onClick={registerSeparateProviderDeal}>아니요, 새로 등록할게요</button></div></section></div>}
+    {priceSetupKind === "provider" && pendingProvider && <div className="overlay"><section className="sheet matchSheet" role="dialog" aria-modal="true" aria-label="전문가 인원별 가격 설정"><button className="sheetClose" onClick={() => { setPriceSetupKind(null); setProviderOpen(true); }}>×</button><span className="sectionKicker">TIERED PRICE</span><h2>인원별 공동계약 가격을 정해주세요</h2><p className="sheetProduct">현재 인원 가격과 목표 인원 가격을 동시에 제안합니다.</p><form className="form" onSubmit={submitProviderPriceRange}><div className="formRow"><label>가격 하한<input name="priceFloor" type="number" min="10000" step="1000" defaultValue="100000" required /></label><label>가격 상한<input name="priceCeiling" type="number" min="10000" step="1000" defaultValue="500000" required /></label></div><div className="formRow"><label>현재 기준 인원<input name="currentPeople" type="number" min="1" max="99" defaultValue="3" required /></label><label>현재 인원 1인 가격<input name="currentPrice" type="number" min="10000" step="1000" defaultValue="300000" required /></label></div><div className="formRow"><label>목표 인원<input name="targetPeople" type="number" min="2" max="100" defaultValue="10" required /></label><label>목표 인원 1인 가격<input name="targetPrice" type="number" min="10000" step="1000" defaultValue="200000" required /></label></div>{priceError && <p className="priceError">{priceError}</p>}<p className="notice">ⓘ 고객은 목표 인원까지 기다리거나 현재 인원 가격으로 바로 진행할 수 있습니다. 범위 밖 가격은 제안할 수 없습니다.</p><button className="primary joinButton">가격 단계 등록 후 대기 수요 확인</button></form></section></div>}
+
+    {requestMatch && <div className="overlay"><section className="sheet matchSheet" role="dialog" aria-modal="true" aria-label="기존 공동계약 추천"><span className="sectionKicker">PRIVATE MATCH</span><h2>이 서비스가 이미 있습니다</h2><p className="sheetProduct">가격으로 다투지 않도록 안전 범위와 인원별 가격을 함께 보여드립니다.</p><div className="matchSummary"><span>{serviceCategories.find((item) => item.id === requestMatch.category)?.emoji}</span><div><b>{requestMatch.title}</b><p>{categoryLabel(requestMatch.category)} · {requestMatch.region}</p><small>{requestMatch.date} · 현재 참여 수요 {requestMatch.joined}명</small></div></div><div className="priceNegotiation"><div><span>합의 가능한 안전 범위</span><b>{formatWon(sharedPriceFloor)} ~ {formatWon(sharedPriceCeiling)}</b></div>{matchedCurrentTier && <div className={matchedCurrentPriceAllowed ? "" : "outsideRange"}><span>{matchedCurrentTier.people}명 이상일 때</span><b>{formatWon(matchedCurrentTier.price)}{!matchedCurrentPriceAllowed && " · 범위 밖"}</b></div>}{matchedTargetTier && matchedTargetTier.people !== matchedCurrentTier?.people && <div className="targetDeal"><span>{matchedTargetTier.people}명까지 기다리면</span><b>{formatWon(matchedTargetTier.price)}</b></div>}</div><p className="notice">ⓘ 범위 밖 가격은 선택할 수 없습니다. 다른 회원의 이름·연락처·개별 견적은 공개하지 않습니다.</p><div className="matchChoices priceChoices">{matchedTargetTier && matchedTargetTier.people > requestMatch.joined && <button className="primary" onClick={joinSuggestedRequest}>{matchedTargetTier.people}명 가격까지 기다릴게요</button>}{matchedCurrentTier && matchedCurrentPriceAllowed && <button className="primary currentPriceButton" onClick={acceptCurrentExpertPrice}>현재 인원 가격으로 바로 할게요</button>}{!matchedCurrentTier && <button className="primary" onClick={joinSuggestedRequest}>네, 함께 할게요</button>}<button className="secondaryAction" onClick={registerSeparateRequest}>아니요, 새로 만들게요</button></div></section></div>}
+
+    {providerMatch && pendingProvider && <div className="overlay"><section className="sheet matchSheet" role="dialog" aria-modal="true" aria-label="대기 수요 추천"><span className="sectionKicker">PRIVATE DEMAND</span><h2>이미 당신의 서비스를 기다리는 사람들이 있습니다</h2><p className="sheetProduct">설정한 안전 범위와 인원별 가격으로 공동계약을 제안할 수 있습니다.</p><div className="matchSummary"><span>{serviceCategories.find((item) => item.id === providerMatch.category)?.emoji}</span><div><b>{providerMatch.title}</b><p>{categoryLabel(providerMatch.category)} · {providerMatch.region}</p><small>{providerMatch.date} · 현재 참여 수요 {providerMatch.joined}명</small></div></div><div className="priceNegotiation"><div><span>전문가 제안 가능 범위</span><b>{formatWon(pendingProvider.priceFloor ?? 0)} ~ {formatWon(pendingProvider.priceCeiling ?? 0)}</b></div>{pendingProvider.priceTiers?.map((tier) => <div className={tier.people === pendingProvider.target ? "targetDeal" : ""} key={tier.people}><span>{tier.people}명일 때 1인 가격</span><b>{formatWon(tier.price)}</b></div>)}</div><p className="notice">ⓘ 고객은 목표 인원까지 기다리거나 현재 인원 가격으로 바로 진행할 수 있습니다. 범위 밖 재흥정은 제한됩니다.</p><div className="matchChoices"><button className="primary" onClick={acceptWaitingDemand}>이 가격 단계로 제안할게요</button><button className="secondaryAction" onClick={registerSeparateProviderDeal}>아니요, 새로 등록할게요</button></div></section></div>}
 
     {consultDeal && <div className="overlay" onMouseDown={() => setConsultDeal(null)}><section className="sheet" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="상담 신청"><button className="sheetClose" onClick={() => setConsultDeal(null)}>×</button><span className="sectionKicker">CONSULTATION</span><h2>{consultDeal.source === "customer" ? "인증 업체 상담 신청" : "서비스 상담 신청"}</h2><p className="sheetProduct">{consultDeal.title}</p><form className="form" onSubmit={submitConsultation}><label>{consultDeal.source === "customer" ? "업체명" : "신청자 이름"}<input name="name" required /></label><label>연락처<input name="contact" required placeholder="010-0000-0000" /></label><label>상담 내용<textarea name="summary" required placeholder="상담에 필요한 작업 조건만 작성해 주세요." /></label><label className="consentCheck"><input type="checkbox" required /><span>상담을 위해 인증된 상대방에게 상세정보를 제공하는 데 동의합니다.</span></label><p className="notice">ⓘ 상담 신청만으로 목표 인원에 포함되지 않습니다. 업체가 가능 처리하고 최초 견적을 확정해야 승인 인원으로 계산됩니다.</p><button className="primary joinButton">상담 신청</button></form></section></div>}
 

@@ -29,6 +29,7 @@ export type DiscountMode =
 
 export type DealSource = "customer" | "provider";
 export type DealStatus = "recruiting" | "contracted" | "unmatched";
+export type PriceTier = { people: number; price: number };
 
 export type ServiceDeal = {
   id: number;
@@ -50,6 +51,9 @@ export type ServiceDeal = {
   credential?: string;
   desiredPrice?: number;
   initialQuote?: number;
+  priceFloor?: number;
+  priceCeiling?: number;
+  priceTiers?: PriceTier[];
   route?: string;
   reverseRoute?: string;
   vehicleTon?: string;
@@ -67,6 +71,8 @@ export type ServiceRequestInput = {
   title: string;
   detail: string;
   desiredPrice: number;
+  priceFloor?: number;
+  priceCeiling?: number;
 };
 
 export type ProviderDealInput = {
@@ -80,6 +86,9 @@ export type ProviderDealInput = {
   discountRate: number;
   providerName: string;
   credential: string;
+  priceFloor?: number;
+  priceCeiling?: number;
+  priceTiers?: PriceTier[];
   route?: string;
   reverseRoute?: string;
   vehicleTon?: string;

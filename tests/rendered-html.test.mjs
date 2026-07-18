@@ -68,6 +68,10 @@ test("필수 서비스 카테고리와 안전장치를 표시한다", async () =
   assert.match(marketplace, /이미 당신의 서비스를 기다리는 사람들이 있습니다/);
   assert.match(marketplace, /아니요, 새로 만들게요/);
   assert.match(marketplace, /아니요, 새로 등록할게요/);
+  assert.match(marketplace, /안전 가격 범위를 정해주세요/);
+  assert.match(marketplace, /인원별 공동계약 가격을 정해주세요/);
+  assert.match(marketplace, /현재 인원 가격으로 바로 할게요/);
+  assert.match(marketplace, /가격까지 기다릴게요/);
 
   assert.match(html, /최초 견적/);
   assert.match(html, /자격 인증/);
