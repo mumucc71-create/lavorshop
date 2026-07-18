@@ -16,6 +16,7 @@ export const serviceCategories: Array<{ id: "all" | ServiceCategory; emoji: stri
   { id: "designDevelopment", emoji: "💻", label: "디자인·개발", group: "field" },
   { id: "automotive", emoji: "🚗", label: "자동차", group: "field" },
   { id: "pets", emoji: "🐾", label: "반려동물", group: "field" },
+  { id: "custom", emoji: "✍️", label: "기타·직접 입력", group: "field" },
   { id: "insurance", emoji: "🛡️", label: "보험 상담", group: "expert" },
   { id: "judicialScrivener", emoji: "⚖️", label: "법무·법무사", group: "expert" },
   { id: "taxAccounting", emoji: "🧾", label: "세무·회계", group: "expert" },

@@ -64,6 +64,12 @@ test("필수 서비스 카테고리와 안전장치를 표시한다", async () =
     assert.match(serviceData, new RegExp(category));
   }
 
+  assert.match(serviceData, /기타·직접 입력/);
+  assert.match(marketplace, /서비스 카테고리/);
+  assert.match(marketplace, /정확한 서비스명 직접 입력/);
+  assert.match(marketplace, /name="serviceName"/);
+  assert.match(marketplace, /describesSameService\(input\.serviceName/);
+
   assert.match(marketplace, /이 서비스가 이미 있습니다/);
   assert.match(marketplace, /이미 당신의 서비스를 기다리는 사람들이 있습니다/);
   assert.match(marketplace, /아니요, 새로 만들게요/);

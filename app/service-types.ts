@@ -1,4 +1,5 @@
 export type ServiceCategory =
+  | "custom"
   | "moving"
   | "moveCleaning"
   | "applianceCleaning"
@@ -35,6 +36,7 @@ export type ServiceDeal = {
   id: number;
   source: DealSource;
   category: ServiceCategory;
+  serviceName?: string;
   mode: DiscountMode;
   title: string;
   region: string;
@@ -66,6 +68,7 @@ export type ServiceDeal = {
 
 export type ServiceRequestInput = {
   category: ServiceCategory;
+  serviceName: string;
   region: string;
   date: string;
   title: string;
@@ -77,6 +80,7 @@ export type ServiceRequestInput = {
 
 export type ProviderDealInput = {
   category: ServiceCategory;
+  serviceName: string;
   mode: Exclude<DiscountMode, "priceRequest">;
   region: string;
   date: string;
