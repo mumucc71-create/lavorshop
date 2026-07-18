@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { discountModes, initialServiceDeals, serviceCategories } from "./service-data";
+import { describesSameService } from "./service-matching";
 import type { DiscountMode, ProviderDealInput, ServiceCategory, ServiceDeal, ServiceRequestInput } from "./service-types";
 
 type RoleView = "customer" | "provider";
@@ -9,14 +10,7 @@ type RoleView = "customer" | "provider";
 const modeLabel = (mode: DiscountMode) => discountModes.find((item) => item.id === mode)?.label ?? mode;
 const categoryLabel = (category: ServiceCategory) => serviceCategories.find((item) => item.id === category)?.label ?? category;
 const formatWon = (value: number) => `${value.toLocaleString("ko-KR")}원`;
-const genericServiceWords = new Set(["공동", "계약", "요청", "서비스", "상담", "할인", "같이", "해주세요", "진행"]);
-const serviceWords = (title: string) => title.toLowerCase().split(/[\s·/↔→~(),]+/).map((word) => word.replace(/[^0-9a-z가-힣]/g, "")).filter((word) => word.length >= 2 && !genericServiceWords.has(word));
-const describesSameService = (left: string, right: string) => {
-  const leftWords = serviceWords(left);
-  const rightText = right.toLowerCase().replace(/\s/g, "");
-  const matchedWords = leftWords.filter((word) => rightText.includes(word));
-  return matchedWords.length >= Math.min(2, leftWords.length) && matchedWords.length > 0;
-};
+const categoriesCanMatch = (left: ServiceCategory, right: ServiceCategory) => left === right || left === "custom" || right === "custom";
 const referencePrice = (deal: ServiceDeal) => deal.initialQuote || deal.desiredPrice || 100000;
 const dealPriceFloor = (deal: ServiceDeal) => deal.priceFloor ?? Math.round(referencePrice(deal) * 0.75 / 1000) * 1000;
 const dealPriceCeiling = (deal: ServiceDeal) => deal.priceCeiling ?? Math.round(referencePrice(deal) * 1.3 / 1000) * 1000;
@@ -85,7 +79,7 @@ export default function ServiceMarketplace() {
   };
 
   const findRequestMatch = (input: ServiceRequestInput) => {
-    const match = deals.find((deal) => deal.category === input.category && deal.status === "recruiting" && describesSameService(input.serviceName, deal.serviceName ?? deal.title) && priceRangesOverlap(input.priceFloor, input.priceCeiling, deal));
+    const match = deals.find((deal) => categoriesCanMatch(deal.category, input.category) && deal.status === "recruiting" && describesSameService(input.serviceName, deal.serviceName ?? deal.title) && priceRangesOverlap(input.priceFloor, input.priceCeiling, deal));
     if (match) {
       setPendingRequest(input);
       setRequestMatch(match);
@@ -95,7 +89,7 @@ export default function ServiceMarketplace() {
   };
 
   const findProviderMatch = (input: ProviderDealInput) => {
-    const match = deals.find((deal) => deal.source === "customer" && deal.category === input.category && deal.status === "recruiting" && describesSameService(input.serviceName, deal.serviceName ?? deal.title) && priceRangesOverlap(input.priceFloor, input.priceCeiling, deal));
+    const match = deals.find((deal) => deal.source === "customer" && categoriesCanMatch(deal.category, input.category) && deal.status === "recruiting" && describesSameService(input.serviceName, deal.serviceName ?? deal.title) && priceRangesOverlap(input.priceFloor, input.priceCeiling, deal));
     if (match) {
       setPendingProvider(input);
       setProviderMatch(match);
@@ -356,7 +350,7 @@ export default function ServiceMarketplace() {
 
     <footer><div className="brand footerBrand"><span className="brandMark">같이</span><span><strong>같이딜</strong><small>Better services together</small></span></div><p>© 2026 GACHIDEAL · 작동형 데모</p></footer>
 
-    {requestOpen && <div className="overlay" onMouseDown={() => setRequestOpen(false)}><section className="sheet sellerSheet" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="서비스 요청 등록"><button className="sheetClose" onClick={() => setRequestOpen(false)}>×</button>{!successMessage ? <><span className="sectionKicker">CUSTOMER REQUEST</span><h2>이 가격에 해주세요</h2><p className="sheetProduct">같은 서비스가 필요한 고객이 ‘저도요’로 모일 수 있습니다.</p><form className="form sellerForm" onSubmit={addServiceRequest}><div className="formRow"><label>서비스 카테고리<select name="category" required>{serviceCategories.filter((item) => item.id !== "all").map((item) => <option value={item.id} key={item.id}>{item.emoji} {item.label}</option>)}</select></label><label>지역 (동 단위)<input name="region" required placeholder="예: 서울 송파구 잠실동" /></label></div><label>정확한 서비스명 직접 입력<input name="serviceName" required placeholder="예: 개인사업자 종합소득세 신고" /></label><div className="formRow"><label>희망 날짜<input name="date" type="date" required /></label><label>희망가격<input name="desiredPrice" type="number" min="10000" step="1000" required placeholder="120000" /></label></div><label>요청 제목<input name="title" required placeholder="예: 종합소득세 신고 같이 하실 분" /></label><label>작업 내용<textarea name="detail" required placeholder="상세주소와 연락처는 입력하지 마세요. 작업 규모와 조건만 작성해 주세요." /></label><p className="notice">ⓘ 맞는 카테고리가 없으면 ‘기타·직접 입력’을 선택하세요. 정확한 서비스명과 조건이 일치할 때만 기존 공동계약을 추천합니다.</p><button className="primary joinButton">서비스 요청 등록</button></form></> : <Success message={successMessage} onClose={() => setRequestOpen(false)} />}</section></div>}
+    {requestOpen && <div className="overlay" onMouseDown={() => setRequestOpen(false)}><section className="sheet sellerSheet" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="서비스 요청 등록"><button className="sheetClose" onClick={() => setRequestOpen(false)}>×</button>{!successMessage ? <><span className="sectionKicker">CUSTOMER REQUEST</span><h2>이 가격에 해주세요</h2><p className="sheetProduct">같은 서비스가 필요한 고객이 ‘저도요’로 모일 수 있습니다.</p><form className="form sellerForm" onSubmit={addServiceRequest}><div className="formRow"><label>서비스 카테고리<select name="category" required>{serviceCategories.filter((item) => item.id !== "all").map((item) => <option value={item.id} key={item.id}>{item.emoji} {item.label}</option>)}</select></label><label>지역 (동 단위)<input name="region" required placeholder="예: 서울 송파구 잠실동" /></label></div><label>정확한 서비스명 직접 입력<input name="serviceName" required placeholder="예: 강아지 미용, 반려견 미용" /></label><div className="formRow"><label>희망 날짜<input name="date" type="date" required /></label><label>희망가격<input name="desiredPrice" type="number" min="10000" step="1000" required placeholder="120000" /></label></div><label>요청 제목<input name="title" required placeholder="예: 반려견 미용 같이 하실 분" /></label><label>작업 내용<textarea name="detail" required placeholder="상세주소와 연락처는 입력하지 마세요. 작업 규모와 조건만 작성해 주세요." /></label><p className="notice">ⓘ ‘반려견·강아지’처럼 표현이 달라도 유사어를 자동으로 연결합니다. 맞는 카테고리가 없으면 ‘기타·직접 입력’을 선택하세요.</p><button className="primary joinButton">서비스 요청 등록</button></form></> : <Success message={successMessage} onClose={() => setRequestOpen(false)} />}</section></div>}
 
     {providerOpen && <div className="overlay" onMouseDown={() => setProviderOpen(false)}><section className="sheet sellerSheet" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="할인 서비스 등록"><button className="sheetClose" onClick={() => setProviderOpen(false)}>×</button>{!successMessage ? <><span className="sectionKicker">VERIFIED PROVIDER</span><h2>할인 서비스 등록</h2><p className="sheetProduct">승인한 고객만 목표 인원에 포함되며 고객별 확정 견적에는 같은 할인율이 적용됩니다.</p><form className="form sellerForm" onSubmit={addProviderDeal}><div className="formRow"><label>할인 방식<select name="mode" value={providerMode} onChange={(event) => setProviderMode(event.target.value as ProviderDealInput["mode"])}><option value="group">모이면 할인</option><option value="roundTrip">왕복 할인</option><option value="neighborhood">동네 묶음 할인</option><option value="emptySlot">빈자리 할인</option></select></label><label>서비스 카테고리<select name="category">{serviceCategories.filter((item) => item.id !== "all").map((item) => <option value={item.id} key={item.id}>{item.emoji} {item.label}</option>)}</select></label></div><label>정확한 서비스명 직접 입력<input name="serviceName" required placeholder="예: 개인사업자 종합소득세 신고" /></label><div className="formRow"><label>가능 지역<input name="region" required placeholder="예: 경기 성남시 분당구" /></label><label>가능 날짜·기간<input name="date" required placeholder="예: 2026-08-10 ~ 08-20" /></label></div><div className="formRow"><label>목표 승인 인원<input name="target" type="number" min="2" max="100" defaultValue="3" required /></label><label>할인율<input name="discountRate" type="number" min="1" max="50" defaultValue="10" required /></label></div><label>공동계약 제목<input name="title" required placeholder="예: 종합소득세 신고 공동계약" /></label><label>조건 설명<textarea name="detail" required placeholder="적용 범위, 작업 조건, 고객별 견적 방식 등을 적어 주세요." /></label>{providerMode === "roundTrip" && <><div className="formRow"><label>가는 경로<input name="route" required placeholder="대전 → 천안" /></label><label>반대 경로<input name="reverseRoute" required placeholder="천안 → 대전" /></label></div><div className="formRow"><label>차량 톤수<input name="vehicleTon" required placeholder="1톤" /></label><label>작업 종료·상하차 시간<input name="workWindow" required placeholder="12:30 종료 · 각 60분" /></label></div></>}{providerMode === "neighborhood" && <div className="formRow"><label>작업 반경(km)<input name="radius" type="number" min="1" max="30" required /></label><label>공사 기간<input name="projectPeriod" required placeholder="8월 17일~30일" /></label></div>}<p className="notice">ⓘ 맞는 카테고리가 없으면 ‘기타·직접 입력’을 선택하세요. 목표 달성 전에는 결제를 확정할 수 없습니다.</p><button className="primary joinButton">할인 서비스 등록</button></form></> : <Success message={successMessage} onClose={() => setProviderOpen(false)} />}</section></div>}
 
